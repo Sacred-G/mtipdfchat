@@ -10,7 +10,7 @@ from pdf2image import convert_from_path
 
 st.set_page_config(page_title="MTI FieldTech AI", layout="wide")
 
-openai_api_key = st.secrets["general"]["OPENAI_API_KEY"]
+OPENAI_API_KEY = st.secrets["general"]["OPENAI_API_KEY"]
 
 with st.sidebar:
    
