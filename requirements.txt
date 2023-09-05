@@ -2,3 +2,6 @@ streamlit
 streamlit_chat
 openai
 langchain
+pdf2image
+poppler-utils
+pypdf
