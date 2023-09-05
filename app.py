@@ -1,0 +1,133 @@
+import os
+import pandas as pd
+import tempfile
+import pdfplumber
+import streamlit as st
+from streamlit_chat import message
+from agent import Agent
+from pdf2image import convert_from_path
+
+
+st.set_page_config(page_title="MTI FieldTech AI", layout="wide")
+
+with st.sidebar:
+   
+    st.image("Images/mti.png")
+
+
+
+def display_messages():
+    st.subheader("Chat")
+    for i, (msg, is_user) in enumerate(st.session_state["messages"]):
+        message(msg, is_user=is_user, key=str(i))
+    st.session_state["thinking_spinner"] = st.empty()
+
+def process_input():
+    if st.session_state["user_input"] and len(st.session_state["user_input"].strip()) > 0:
+        user_text = st.session_state["user_input"].strip()
+        with st.session_state["thinking_spinner"], st.spinner(f"Thinking"):
+            agent_text = st.session_state["agent"].ask(user_text)
+        st.session_state["messages"].append((user_text, True))
+        st.session_state["messages"].append((agent_text, False))
+        st.session_state["user_input"] = ""  # Clear the input
+        
+        
+        
+def read_csv_or_excel(file_path):
+    if file_path.endswith('.csv'):
+        data = pd.read_csv(file_path)
+    elif file_path.endswith('.xlsx'):
+        data = pd.read_excel(file_path)
+    else:
+        data = None
+    return data
+
+def read_and_save_file():
+    if st.session_state["agent"] is not None:  # Check if agent is not None
+        st.session_state["agent"].forget()  # Call forget method
+
+    st.session_state["messages"] = []
+    st.session_state["user_input"] = ""
+    for file in st.session_state["file_uploader"]:
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            tf.write(file.getbuffer())
+            temp_pdf_path = tf.name
+            st.session_state["temp_pdf_path"] = temp_pdf_path
+            st.session_state["agent"].ingest(temp_pdf_path)  # Ingest the document
+        images = convert_from_path(temp_pdf_path)
+        st.session_state["images"] = images
+
+
+def is_openai_api_key_set() -> bool:
+    return len(st.session_state["OPENAI_API_KEY"]) > 0
+
+def main():
+    if len(st.session_state) == 0:
+        st.session_state["messages"] = []
+        st.session_state["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
+        if is_openai_api_key_set():
+            st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
+        else:
+            st.session_state["agent"] = None
+    with st.sidebar: 
+        if st.text_input("OpenAI API Key", value=st.session_state["OPENAI_API_KEY"], key="input_OPENAI_API_KEY", type="password"):
+            if (
+                len(st.session_state["input_OPENAI_API_KEY"]) > 0
+                and st.session_state["input_OPENAI_API_KEY"] != st.session_state["OPENAI_API_KEY"]
+            ):
+                st.session_state["OPENAI_API_KEY"] = st.session_state["input_OPENAI_API_KEY"]
+                if st.session_state["agent"] is not None:
+                    st.warning("Please, upload the files again.")
+                st.session_state["messages"] = []
+                st.session_state["user_input"] = ""
+                st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
+
+    with st.sidebar:
+        st.subheader("Upload a document")
+        st.file_uploader(
+            "Upload document",
+            type=["pdf"],
+            key="file_uploader",
+            on_change=read_and_save_file,
+            label_visibility="collapsed",
+            accept_multiple_files=True)
+            
+        temp_pdf_path = st.session_state.get("temp_pdf_path", "")  # Retrieve the path from session_state
+
+
+
+    if temp_pdf_path:  # Check if the path is not an empty string
+        text = ""  # Initialize the text variable
+        with pdfplumber.open(temp_pdf_path) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() 
+    
+    images = st.session_state.get("images", [])
+    if images:
+        page_number = st.slider('Select Page:', min_value=1, max_value=len(images), value=1) - 1
+        st.image(images[page_number])
+        st.write("PDF processed. Ask your questions below.")
+    
+        
+
+
+
+    st.session_state["ingestion_spinner"] = st.empty()
+
+    display_messages()
+    st.text_input("Message", key="user_input", disabled=not is_openai_api_key_set(), on_change=process_input)
+    
+    with st.sidebar:
+        with st.expander("Settings",  expanded=True):
+            TEMP = st.slider(label="LLM Temperature", min_value=0.0, max_value=1.0, value=0.3)
+            st.markdown("Adjust the LLM Temperature: A higher value makes the output more random, while a lower value makes it more deterministic.")
+            st.markdown("NOTE: Anything above 0.7 may produce hallucinations")
+    st.divider()
+    st.markdown("Created by Steven Bouldin")
+    st.markdown("Version: 1.2")
+
+
+
+
+if __name__ == "__main__":
+    main()
