@@ -1,4 +1,10 @@
+poppler-utils
 streamlit
 streamlit_chat
-openai
 langchain
+openai
+faiss-cpu
+pypdf
+tiktoken
+pdfplumber
+pdf2image
