@@ -9,10 +9,10 @@ from agent import Agent
 from pdf2image import convert_from_path
 
 # Access the API key from st.secrets
-openai_api_key = st.secrets["openai_api_key"]
+
 
 # Initialize the Agent with the API key
-agent = Agent(openai_api_key=openai_api_key)
+
 st.set_page_config(page_title="MTI FieldTech AI", layout="wide")
 
 st.image("Images/mti.png", caption='MTI Fieldtech Chatbot', width=300)
